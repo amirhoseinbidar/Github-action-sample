@@ -39,9 +39,8 @@ jobs:
                 docker build -t myapp:latest .
             - name: Scan the Docker Image with Trivy
               run: |
-                trivy image --severity HIGH, CRITICAL myapp:latest
+                trivy image --severity HIGH,CRITICAL myapp:latest
             - name: Push Docker Image to Amazon ECR
               run: |  
                 docker tag myapp:latest ${{ steps.login-ecr.outputs.registry }}/myapp:latest
                 docker push ${{ steps.login-ecr.outputs.registry }}/myapp:latest
- 
