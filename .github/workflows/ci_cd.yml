@@ -1,0 +1,46 @@
+name: Build and Push to ECR
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+    
+jobs:
+    build-and_deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Configure AWS Credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+                aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+                aws-region: ${{ secrets.AWS_REGION}}
+            - name: Login to Amazon ECR
+              id: login-ecr
+              uses: aws-actions/amazon-ecr-login@v2
+            - name: Install Trivy
+              run: |
+                sudo apt-get update
+                sudo apt-get install wget gnupg
+                wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+                echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+                sudo apt-get update
+                sudo apt-get install trivy
+            - name: Lint Dockerfile with Hadolint
+              uses: hadolint/hadolint-action@v3.1.0
+              with:
+                dockerfile: ./Dockerfile
+            - name: Build Docker Image
+              run: |
+                docker build -t myapp:latest .
+            - name: Scan the Docker Image with Trivy
+              run: |
+                trivy image --severity HIGH, CRITICAL myapp:latest
+            - name: Push Docker Image to Amazon ECR
+              run: |  
+                docker tag myapp:latest ${{ steps.login-ecr.outputs.registry }}/myapp:latest
+                docker push ${{ steps.login-ecr.outputs.registry }}/myapp:latest
